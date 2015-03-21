@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	#info {
+		position: absolute;
+		top: 0px; width: 100%;
+		font-family: Monospace;
+		font-size: 20px;
+		padding: 5px;
+		text-align: center;
+		color: #003333
+	}
+	a {color: purple}
+</style>
+</head>
+
+<body>
+
+<script src="js/KeyboardState.js"></script>
+<script src="js/three.min.js"></script>
+<script src="js/OrbitControls.js">
+</script>
+
+<script>
+
+
+var camera, scene, renderer, light, controls;
+var frame;
+
+init();
+animate();
+
+function init() {
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.z = 500;
+    scene.add(camera);
+
+    frame = new THREE.Object3D();
+    a_door = new THREE.Object3D();
+    scene.add(frame);
+    scene.add(a_door);
+
+    doorGeom = new THREE.BoxGeometry(31, 56, 4);
+
+    columnGeom = new THREE.BoxGeometry(2, 60, 4);
+    platformGeom = new THREE.BoxGeometry(36, 2, 8);
+    insideGeom = new THREE.BoxGeometry(4, 60, 4);
+    insideupGeom = new THREE.BoxGeometry(32, 2, 4);
+
+    material = new THREE.MeshLambertMaterial();
+
+    var mesh = new THREE.Mesh(columnGeom, material);
+    var mesh2 = mesh.clone();
+    mesh.position.set(1, 30, -2);
+    mesh2.position.set(5 + 30, 30, -2);
+    var down_mesh = new THREE.Mesh(platformGeom, material);
+    var up_mesh = down_mesh.clone();
+    down_mesh.position.set(18, 1, -4);
+    up_mesh.position.set(18, 60, -4);
+    var inl_mesh = new THREE.Mesh(insideGeom, material);
+    var inr_mesh = inl_mesh.clone();
+    inl_mesh.position.set(2, 30, -6);
+    inr_mesh.position.set(4 + 30, 30, -6);
+    var inp_mesh = new THREE.Mesh(insideupGeom, material);
+    inp_mesh.position.set(18, 58, -6);
+
+    frame.add(mesh);
+    frame.add(down_mesh);
+    frame.add(mesh2);
+    frame.add(up_mesh);
+    frame.add(inl_mesh);
+    frame.add(inr_mesh);
+    frame.add(inp_mesh);
+
+    var door_mesh = new THREE.Mesh(doorGeom, material);
+    door_mesh.position.set( 18.5 , 30.5 , -2 );
+
+    a_door.add(door_mesh);
+    light = new THREE.PointLight(0xffffff);
+    light.position.set(100, 300, 200);
+    scene.add(light);
+
+    var gridXZ = new THREE.GridHelper(100, 10);
+    gridXZ.setColors(new THREE.Color(0xff0000), new THREE.Color(0xffffff));
+    scene.add(gridXZ);
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0xcccccc);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+    document.body.appendChild(renderer.domElement);
+
+}
+
+function animate() {
+    controls.update();
+    requestAnimationFrame(animate);
+    render();
+}
+
+function render() {
+
+    renderer.render(scene, camera);
+}
+</script>
+</body>
+
+</html>
