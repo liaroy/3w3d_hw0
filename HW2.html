@@ -16,23 +16,38 @@
 </head>
 
 <body>
-
+<div id="info"> <a href="javascript:toggle();">OPEN/CLOSE<br/></a>
+<div id="info1"> <a href="javascript:voic();">VOICE</a><br/>
+</div>
 <script src="js/KeyboardState.js"></script>
 <script src="js/three.min.js"></script>
 <script src="js/OrbitControls.js">
 </script>
 
+<audio id="doorsound" autoplay loop style="display:none">
+<source src="sound/doorsound.wav" type='audio/mp3'>
+</audio>
+<audio id="boom" style="display:none">
+<source src="sound/doorboom.mp3" type='audio/mp3'>
+</audio>
+<audio id="voiceg" style="display:none">
+<source src="sound/211323.mp3" type='audio/mp3'>
+</audio>
+
 <script>
 
 
-var camera, scene, renderer, light, controls;
-var frame;
-
+var camera, scene, renderer, light, controls, soundVal = 0.0;
+var frame, sign = false , voc = true ;//t=open f=close;
+var  doorsound,doorboom,voiceg,t = 0,op = 0;
 init();
 animate();
 
 function init() {
 
+	doorsound = document.getElementById ('doorsound');
+	doorboom = document.getElementById ('boom');
+	voiceg = document.getElementById ('voiceg');
     scene = new THREE.Scene();
 
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
@@ -41,33 +56,48 @@ function init() {
 
     frame = new THREE.Object3D();
     a_door = new THREE.Object3D();
+    
     scene.add(frame);
     scene.add(a_door);
 
     doorGeom = new THREE.BoxGeometry(31, 56, 4);
-
+    copperGeom = new THREE.BoxGeometry(1, 5, 0.25);
+    
     columnGeom = new THREE.BoxGeometry(2, 60, 4);
     platformGeom = new THREE.BoxGeometry(36, 2, 8);
     insideGeom = new THREE.BoxGeometry(4, 60, 4);
     insideupGeom = new THREE.BoxGeometry(32, 2, 4);
+    
+    coppercyGeom = new THREE.CylinderGeometry( 0.5, 0.5, 4.5, 32 );
+    handleGeom = new THREE.CylinderGeometry( 1, 1, 2, 32 );
+    cyhandGeom = new THREE.SphereGeometry( 2, 32, 32 );
 
     material = new THREE.MeshLambertMaterial();
+	var coluTexture = new THREE.ImageUtils.loadTexture( 'images/colu.jpg' );
+	
+	var texture = THREE.ImageUtils.loadTexture('images/wood.jpg');
+    var bumptex = THREE.ImageUtils.loadTexture('images/wood1.jpg');
 
-    var mesh = new THREE.Mesh(columnGeom, material);
+    var mesh = new THREE.Mesh(columnGeom, new THREE.MeshLambertMaterial ({color: 0xE0FFFF}));
     var mesh2 = mesh.clone();
     mesh.position.set(1, 30, -2);
     mesh2.position.set(5 + 30, 30, -2);
-    var down_mesh = new THREE.Mesh(platformGeom, material);
+    var down_mesh = new THREE.Mesh(platformGeom, new THREE.MeshLambertMaterial ({color: 0xE0FFFF}));
     var up_mesh = down_mesh.clone();
     down_mesh.position.set(18, 1, -4);
     up_mesh.position.set(18, 60, -4);
-    var inl_mesh = new THREE.Mesh(insideGeom, material);
+    var inl_mesh = new THREE.Mesh(insideGeom, new THREE.MeshLambertMaterial ({color: 0xE0FFFF}));
     var inr_mesh = inl_mesh.clone();
     inl_mesh.position.set(2, 30, -6);
     inr_mesh.position.set(4 + 30, 30, -6);
-    var inp_mesh = new THREE.Mesh(insideupGeom, material);
+    var inp_mesh = new THREE.Mesh(insideupGeom, new THREE.MeshLambertMaterial ({color: 0xE0FFFF}));
     inp_mesh.position.set(18, 58, -6);
-
+    var uplock = new THREE.Mesh(coppercyGeom,new THREE.MeshBasicMaterial({
+        map: coluTexture, side: THREE.DoubleSide
+    }));
+    var dolock = uplock.clone();
+    uplock.position.set(34 , 54 , 0.5);
+    dolock.position.set(34 , 12 , 0.5);
     frame.add(mesh);
     frame.add(down_mesh);
     frame.add(mesh2);
@@ -75,11 +105,55 @@ function init() {
     frame.add(inl_mesh);
     frame.add(inr_mesh);
     frame.add(inp_mesh);
+    frame.add(uplock);
+    frame.add(dolock);
 
-    var door_mesh = new THREE.Mesh(doorGeom, material);
-    door_mesh.position.set( 18.5 , 30.5 , -2 );
-
+	
+	
+    var door_mesh = new THREE.Mesh(doorGeom, new THREE.MeshPhongMaterial ({
+							color: 0xFFFFFF,
+							map: texture,
+							bumpMap: bumptex,
+							bumpScale: 0.9,
+                            side: THREE.DoubleSide
+                            }));
+    door_mesh.position.set( -15.5 , 28.5 , -2 );
+    var doorhandle = new THREE.Mesh(handleGeom, new THREE.MeshBasicMaterial({
+        map: coluTexture, side: THREE.DoubleSide
+    }));
+    doorhandle.position.set( -27 , 32 , 1 );
+    doorhandle.rotation.x = Math.PI/2;
+    var indoorhandle = doorhandle.clone();
+    indoorhandle.position.set( -27 , 32 , -5 );
+    indoorhandle.rotation.x = Math.PI/2;
+    var doorcycle = new THREE.Mesh(cyhandGeom,  new THREE.MeshBasicMaterial({
+        map: coluTexture, side: THREE.DoubleSide
+    }));
+    doorcycle.position.set( -27 , 32 , 3 );
+    var indoorcycle = doorcycle.clone();
+    indoorcycle.position.set( -27 , 32 , -7 );
+    
+    a_door.add(doorcycle);
+    a_door.add(indoorcycle);
+    a_door.add(doorhandle);
+    a_door.add(indoorhandle);
     a_door.add(door_mesh);
+    a_door.position.set(34 , 2 , 0);
+
+    var copper_u_d = new THREE.Mesh(copperGeom,  new THREE.MeshBasicMaterial({
+        map: coluTexture, side: THREE.DoubleSide
+    }));
+    copper_u_d.position.set( -1 , 52 , 0.25 );
+    var copper_d_d = copper_u_d.clone();
+    copper_d_d.position.set( -1 , 10 , 0.25 );
+    var copper_u_f = copper_u_d.clone();
+    copper_u_f.position.set( 34.5 , 54 , 0.25 );
+    var copper_d_f = copper_u_d.clone();
+    copper_d_f.position.set( 34.5 , 12 , 0.25 );
+    a_door.add(copper_u_d);
+    a_door.add(copper_d_d);
+    frame.add(copper_u_f);
+    frame.add(copper_d_f);
     light = new THREE.PointLight(0xffffff);
     light.position.set(100, 300, 200);
     scene.add(light);
@@ -99,15 +173,47 @@ function init() {
 }
 
 function animate() {
+    if(a_door.rotation.y > 0.2 && a_door.rotation.y < 1.5){
+        doorsound.volume = 1.0;
+    }
+	else{
+		doorsound.volume = 0.0;
+	}
+	if( a_door.rotation.y < 0.05 && sign == false && t==1){
+				doorboom.volume = 1.0;
+				doorboom.play();
+				t = 0;
+				op = 0;
+			}
+	
     controls.update();
     requestAnimationFrame(animate);
     render();
 }
-
 function render() {
-
+    if(sign == true){
+        if(a_door.rotation.y <= Math.PI/2)
+            a_door.rotation.y += 0.05;
+       }
+    else{
+        if(a_door.rotation.y > 0){
+            a_door.rotation.y -= 0.05;	
+		}
+		
+    }
     renderer.render(scene, camera);
 }
+function toggle() {
+	sign = !sign;
+	t = 1;
+	if(op == 0 && voc == true)
+		voiceg.play();
+	op = 1;
+}
+function voic(){
+    voc = !voc;
+}
+
 </script>
 </body>
 
