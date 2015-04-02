@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+
+</style>
+</head>
+<body>
+<script src="js/KeyboardState.js"></script>
+<script src="js/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+
+<script type="x-shader/x-fragment" id="fragmentShaderDepth">
+    uniform sampler2D texture;
+    varying vec2 vUV;
+
+    vec4 pack_depth(const in float depth) {
+
+        const vec4 bit_shift = vec4(256.0 * 256.0 * 256.0, 256.0 * 256.0, 256.0, 1.0);
+        const vec4 bit_mask = vec4(0.0, 1.0 / 256.0, 1.0 / 256.0, 1.0 / 256.0);
+        vec4 res = fract(depth * bit_shift);
+        res -= res.xxyz * bit_mask;
+        return res;
+
+    }
+
+    void main() {
+
+        vec4 pixel = texture2D(texture, vUV);
+
+        if (pixel.a < 0.5) discard;
+
+        gl_FragData[0] = pack_depth(gl_FragCoord.z);
+
+    }
+</script>
+<script type="x-shader/x-vertex" id="vertexShaderDepth">
+    varying vec2 vUV;
+
+    void main() {
+
+        vUV = 1.0 * uv;
+
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+
+        gl_Position = projectionMatrix * mvPosition;
+
+    }
+</script>
+
+<script>
+var camera, scene, renderer, geometry, material, light, controls, light_up;
+var clock = new THREE.Clock();
+var keyboard = new KeyboardState();
+var pos = new THREE.Vector3(0, 0, 0), angle_t = 0;
+var speed = 0,
+    rotspeed = 0;
+var x = 0, z = 0;
+var speedR = 0,
+    speedL = 0;
+init();
+animate();
+
+function init() {
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.z = 300;
+    camera.position.y = 100;
+    scene.add(camera);
+
+    THREE.ImageUtils.crossOrigin = '';
+    var colormap = THREE.ImageUtils.loadTexture('images/wheel.png');
+    var colormap2 = THREE.ImageUtils.loadTexture('images/tireside.png');
+
+    var bumpmap = THREE.ImageUtils.loadTexture('images/tirebamp.png');
+    var cement = THREE.ImageUtils.loadTexture('images/cement.jpg');
+    var ice = THREE.ImageUtils.loadTexture('images/icetext.jpg');
+
+
+
+    tire = new THREE.Object3D();
+    geometry = new THREE.CircleGeometry(5, 20);
+    material = new THREE.MeshBasicMaterial({
+        map: colormap,
+        transparent: true, // for cut-out texture
+        side: THREE.DoubleSide
+    });
+    var mesh = new THREE.Mesh(geometry, material);
+    colormap2.wrapS = colormap2.wrapT = THREE.RepeatWrapping;
+    colormap2.repeat.set(8, 1);
+
+    ///////////////////////////////////////////////////////////////////
+    var uniforms = {
+        texture: {
+            type: "t",
+            value: colormap
+        }
+    };
+    var vertexShader = document.getElementById('vertexShaderDepth').textContent;
+    var fragmentShader = document.getElementById('fragmentShaderDepth').textContent;
+    mesh.customDepthMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader
+    });
+	
+    ///////////////////////////////////////////////////////////////////
+    var mesh2 = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 4, 30, 1, true), // only side
+    new THREE.MeshPhongMaterial({
+        color: 0xFFFFFF,
+        map: colormap2,
+        bumpMap: bumpmap,
+        bumpScale: 0.9,
+        side: THREE.DoubleSide
+    }));
+
+
+    
+	mesh2.rotation.z = Math.PI / 2;
+    mesh.position.set(2, 0, 0);
+	mesh.rotation.y = Math.PI/2;
+    mesh0 = mesh.clone();
+    mesh0.position.set(-2, 0, 0);
+    //mesh0.rotation.y = Math.PI/2;
+	mesh0.customDepthMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader
+    });
+    //tire.rotation.z = Math.PI/2;
+    tire.add(mesh);
+    tire.add(mesh0);
+    tire.add(mesh2);
+    scene.add(tire);
+
+    tire.position.set(0, 5, 0);
+
+
+
+    //light = new THREE.PointLight(0xffffff);
+    //light.position.set(100, 300, 200);
+    //scene.add(light);
+
+    light_up = new THREE.SpotLight(0xffffff, 1.5);
+    light_up.position.set(0, 150, 0);
+    light_up.angle = Math.PI / 6;
+    light_up.exponent = 10;
+    scene.add(light_up);
+    light_up.target = tire;
+
+    var cementMaterial = new THREE.MeshLambertMaterial({
+        map: cement,
+        side: THREE.DoubleSide
+    });
+    var floorGeometry = new THREE.PlaneGeometry(300, 300, 20, 20); //, 10, 10);  // not clear what segment does
+    var floor = new THREE.Mesh(floorGeometry, cementMaterial);
+    //floor.position.y = -0.5;
+    floor.rotation.x = Math.PI / 2;
+    scene.add(floor);
+
+    var amblight = new THREE.AmbientLight(0x888888); // soft white light
+    scene.add(amblight);
+
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x333333);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+
+    light_up.castShadow = true;
+    light_up.shadowMapWidth = 1000;
+    light_up.shadowMapHeight = 1000;
+    light_up.shadowCameraNear = 10;
+    light_up.shadowCameraFar = 4000;
+    light_up.shadowCameraFov = light_up.angle / Math.PI * 180;
+
+    console.log(light_up.angle);
+
+    renderer.shadowMapEnabled = true;
+    renderer.shadowMapType = THREE.PCFShadowMap;
+
+    floor.receiveShadow = true;
+    mesh.castShadow = true;
+    mesh0.castShadow = true;
+    mesh2.castShadow = true;
+	tire.castShadow = true;
+
+    document.body.appendChild(renderer.domElement);
+}
+
+function animate() {
+	var dt = clock.getDelta();
+	tire.rotation.order = 'YXZ';
+    tire.rotation.x = tire.rotation.x + speed/Math.PI/25;
+	var dx = 0,dy = 1;
+	
+	
+	angle_t += rotspeed*dt;
+	
+    x = x + speed*Math.cos(angle_t)*dt;
+	z = z - speed*Math.sin(angle_t)*dt;
+	x = myclamp(x,-150,150);
+	z = myclamp(z,-150,150);
+    if (tire != undefined) {
+        //tire.scale.set(0.2, 0.2, 0.2);
+        tire.position.set(x, 5, z);
+        tire.rotation.y = angle_t + Math.PI / 2;
+    }
+
+
+
+    controls.update();
+    requestAnimationFrame(animate);
+	update();
+    render();
+
+}
+
+function render() {
+
+
+    renderer.render(scene, camera);
+}
+
+function update()
+{
+	keyboard.update();                   
+	if ( keyboard.pressed("up") )  
+		speed = speed + 0.5;       
+	else if ( keyboard.pressed("down") )  
+		speed = speed - 0.5;
+	else if ( keyboard.pressed("left") )  
+		speedL += 0.5;
+	else if ( keyboard.pressed("right") )  
+		speedR += 0.5;
+
+	speed *=  0.95;
+	speedL *= 0.95;
+	speedR *= 0.95;
+	
+	speed = myclamp(speed,-20,20)
+	
+	//speed = (speedL+speedR)/2;
+	rotspeed = (speedL - speedR)/10;
+}
+
+function myclamp(x,lo,hi)
+{
+	if (x < lo) return lo;
+	if (x > hi) return hi;
+	return x;
+}
+
+
+</script>
+</body>
+
+</html>
