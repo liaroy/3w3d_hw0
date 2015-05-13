@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#container {
+    width:60%;
+    float:left;
+    background-color:pink;
+    margin-top: 5px;
+}
+#cnvsFrame {
+    height: 0;
+    padding-bottom:100%;
+}
+#save {
+    width:30%;
+    float:right;
+}
+#openselect {
+    width:30%;
+    float:right;
+}
+body {
+    overflow: hidden;
+}
+</style>
+</head>
+
+<body>
+<div id="container">
+    <div id="cnvsFrame">
+        <canvas id="cnvs"></canvas>
+    </div>
+</div>
+<input type="file" id="openselect" />
+<br><br>pick wall and select picture from you computer. note no foolproof.
+<br>need to load twice. reason unknown.
+<br>please use chrome,don't use firefox.
+<div style="clear:both"></div>
+<hr>
+<script src="js/KeyboardState.js"></script>
+<script src="js/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+    
+</script>
+
+<script>
+
+var camera, scene, renderer, geometry, material, mesh, light, controls;
+var tex1, tex2, paint_1, paint_2, paint_3, walltype = 0;
+var mouse = new THREE.Vector2();
+var raycaster;
+var openbtn = document.getElementById("openselect");
+
+openselect.addEventListener("change", doOpen, false);
+var image = new Image();
+var theCanvas, theCanvasFrame;
+init();
+animate();
+
+function init() {
+    theCanvas = document.getElementById("cnvs");
+    theCanvasFrame = document.getElementById("cnvsFrame");
+
+    renderer = new THREE.WebGLRenderer({
+        canvas: theCanvas,
+        antialias: true
+    });
+    var ww = theCanvasFrame.clientWidth;
+    var hh = theCanvasFrame.clientHeight;
+    renderer.setSize(ww, hh);
+    renderer.setClearColor(0x222222);
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(50, ww / hh, 1, 1000);
+    camera.position.y = 200;
+    camera.position.z = 200;
+    scene.add(camera);
+
+    //////////////////////////////////////////////////////
+    THREE.ImageUtils.crossOrigin = '';
+    tex1 = THREE.ImageUtils.loadTexture('http://i.imgur.com/SioC0Bw.png');
+    tex2 = THREE.ImageUtils.loadTexture('http://i.imgur.com/p8CRm9W.jpg');
+    var cement = THREE.ImageUtils.loadTexture('http://liaroy.github.io/3w3d_hw0/images/icetext.jpg');
+    geometry = new THREE.PlaneGeometry(100, 100);
+    material = new THREE.MeshLambertMaterial();
+
+    mesh = new THREE.Mesh(geometry, material);
+    // scene.add(mesh);
+
+    light = new THREE.PointLight(0xffffff);
+    light.position.set(100, 300, 200);
+    scene.add(light);
+
+    wallGeom = new THREE.BoxGeometry(40, 40, 5);
+    var wall_1 = new THREE.Mesh(wallGeom, new THREE.MeshLambertMaterial({
+        color: 0xFFFFFF
+    }));
+    scene.add(wall_1);
+    wall_1.position.set(0, 20, 0);
+    var paintGeom = new THREE.PlaneGeometry(30, 30, 20, 20);
+    paint_1 = new THREE.Mesh(paintGeom, new THREE.MeshLambertMaterial({
+        color: 0xDC7100
+    }));
+    wall_1.add(paint_1);
+    wall_1.name = "wall_1";
+    paint_1.position.set(0, 0, 2.6);
+
+
+    var wall_2 = new THREE.Mesh(wallGeom, new THREE.MeshLambertMaterial({
+        color: 0xFFFFFF
+    }));
+    scene.add(wall_2);
+    wall_2.position.set(40, 20, 40);
+
+    paint_2 = new THREE.Mesh(paintGeom, new THREE.MeshLambertMaterial({
+        color: 0xDC7100
+    }));
+    wall_2.add(paint_2);
+    wall_2.name = "wall_2";
+    paint_2.position.set(0, 0, 2.6);
+
+    var wall_3 = new THREE.Mesh(wallGeom, new THREE.MeshLambertMaterial({
+        color: 0xFFFFFF
+    }));
+    scene.add(wall_3);
+    wall_3.position.set(40, 20, -40);
+
+    paint_3 = new THREE.Mesh(paintGeom, new THREE.MeshLambertMaterial({
+        color: 0xDC7100
+    }));
+    wall_3.add(paint_3);
+    wall_3.name = "wall_3";
+    paint_3.position.set(0, 0, 2.6);
+
+
+
+    var cementMaterial = new THREE.MeshLambertMaterial({
+        map: cement,
+        side: THREE.DoubleSide
+    });
+    var floorGeometry = new THREE.PlaneGeometry(300, 300, 20, 20);
+    var floor = new THREE.Mesh(floorGeometry, cementMaterial);
+    floor.rotation.x = Math.PI / 2;
+    scene.add(floor);
+
+    var gridXZ = new THREE.GridHelper(100, 10);
+    gridXZ.setColors(new THREE.Color(0xff0000), new THREE.Color(0xffffff));
+    scene.add(gridXZ);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+    raycaster = new THREE.Raycaster();
+    document.addEventListener('mousedown', onDocumentMouseDown, false);
+    // the following is not needed for "embed" mode
+    // document.body.appendChild(renderer.domElement);
+}
+
+// remember "no warp in <body>"
+//
+
+
+function animate() {
+    controls.update();
+
+    requestAnimationFrame(animate);
+    render();
+}
+
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+function onDocumentMouseDown(event) {
+    // PICKING DETAILS: 
+    // convert mouse.xy = [-1,1]^2 (NDC)
+    // unproject (mouse.xy, 1) to a point on the far plane (in world coordinate)
+    // set raycaster (origin, direction)
+    // find intersection objects, (closest first) 
+    // each record as
+    // [ { distance, point, face, faceIndex, object }, ... ]
+
+    event.preventDefault();
+    mouse.x = (event.clientX / theCanvasFrame.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY / theCanvasFrame.clientHeight) * 2 + 1;
+
+    // find intersections
+    var vector = new THREE.Vector3(mouse.x, mouse.y, 1).unproject(camera);
+    raycaster.set(camera.position, vector.sub(camera.position).normalize());
+    var intersects = raycaster.intersectObjects(scene.children);
+    if (intersects.length > 0) {
+
+        if (intersects[0].object.name === "wall_1") walltype = 1;
+        else if (intersects[0].object.name === "wall_2") walltype = 2;
+        else if (intersects[0].object.name === "wall_3") walltype = 3;
+    }
+    //alert(walltype);
+}
+
+
+
+function doOpen(evt) {
+    var file = evt.target.files[0];
+    //alert(file);
+    var reader = new FileReader();
+    reader.onload = function () {
+        image.src = reader.result;
+    };
+    loadtex = THREE.ImageUtils.loadTexture(image.src);
+    if (walltype == 1) {
+        paint_1.material = new THREE.MeshBasicMaterial({
+            map: loadtex,
+            side: THREE.DoubleSide
+        });
+    }
+    if (walltype == 2) {
+        paint_2.material = new THREE.MeshBasicMaterial({
+            map: loadtex,
+            side: THREE.DoubleSide
+        });
+    }
+
+    if (walltype == 3) {
+        paint_3.material = new THREE.MeshBasicMaterial({
+            map: loadtex,
+            side: THREE.DoubleSide
+        });
+    }
+    reader.readAsDataURL(file);
+    // https://developer.mozilla.org/en-US/docs/Web/API/Blob
+    // start reading contents of the Blob,
+    // once finished, the 'result' contains the content
+    // of the file as a text string
+}
+
+</script>
+</body>
+
+</html>
